@@ -20,11 +20,11 @@
       border-radius: 16px;
       box-shadow: 0 20px 40px rgba(0,0,0,0.15);
       width: 100%;
-      max-width: 520px;
+      max-width: 560px;
       padding: 32px 28px;
     }
     h1 {
-      font-size: 1.5rem;
+      font-size: 1.45rem;
       color: #ee4d2d;
       text-align: center;
       margin-bottom: 8px;
@@ -33,7 +33,8 @@
       text-align: center;
       color: #666;
       font-size: 0.9rem;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
+      line-height: 1.5;
     }
     label {
       display: block;
@@ -47,11 +48,11 @@
       padding: 12px 14px;
       border: 1.5px solid #ddd;
       border-radius: 10px;
-      font-size: 0.95rem;
-      transition: border-color 0.2s;
-      margin-bottom: 16px;
+      font-size: 0.9rem;
+      margin-bottom: 14px;
       resize: vertical;
-      min-height: 100px;
+      min-height: 120px;
+      line-height: 1.45;
     }
     textarea:focus {
       outline: none;
@@ -67,11 +68,20 @@
       font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s;
+      margin-bottom: 10px;
     }
     .btn:hover { background: #d73211; }
+    .btn.secondary {
+      background: #28a745;
+    }
+    .btn.secondary:hover { background: #218838; }
+    .btn.ghost {
+      background: #f0f0f0;
+      color: #333;
+    }
+    .btn.ghost:hover { background: #e5e5e5; }
     .result-box {
-      margin-top: 20px;
+      margin-top: 8px;
       display: none;
     }
     .result-box.show { display: block; }
@@ -86,14 +96,22 @@
       border-radius: 10px;
       padding: 12px 14px;
       word-break: break-all;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       color: #222;
       margin-bottom: 12px;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.5;
     }
-    .copy-btn { background: #28a745; }
-    .copy-btn:hover { background: #218838; }
+    .count {
+      font-size: 0.85rem;
+      color: #ee4d2d;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
     .tip {
-      margin-top: 20px;
+      margin-top: 18px;
       font-size: 0.8rem;
       color: #888;
       line-height: 1.55;
@@ -103,87 +121,138 @@
 <body>
   <div class="card">
     <h1>🦐 蝦皮分潤連結轉換器</h1>
-    <p class="subtitle">貼上任意蝦皮商品連結 → 轉成你的分潤追蹤連結</p>
+    <p class="subtitle">
+      依官方 an_redir 規格轉換<br>
+      支援一次多筆 · 隨機 Affiliate ID
+    </p>
 
-    <label for="inputUrl">貼上蝦皮商品連結</label>
-    <textarea id="inputUrl" placeholder="https://shopee.tw/... 或 https://s.shopee.tw/..."></textarea>
+    <label for="inputUrl">貼上蝦皮商品連結（每行一筆）</label>
+    <textarea id="inputUrl" placeholder="https://shopee.tw/...&#10;https://shopee.tw/...&#10;https://s.shopee.tw/..."></textarea>
 
-    <button class="btn" onclick="convert()">轉換成我的分潤連結</button>
+    <button class="btn" onclick="convert()">轉換成分潤連結</button>
+    <button class="btn ghost" onclick="clearAll()">清除</button>
 
     <div class="result-box" id="resultBox">
-      <div class="result-label">你的分潤連結：</div>
+      <div class="count" id="resultCount"></div>
+      <div class="result-label">分潤連結（每行一筆）：</div>
       <div class="result-url" id="resultUrl"></div>
-      <button class="btn copy-btn" onclick="copyResult()">一鍵複製</button>
+      <button class="btn secondary" onclick="copyResult()">一鍵複製全部</button>
     </div>
 
     <p class="tip">
-      ※ 建議貼「完整商品頁連結」，效果最穩定。<br>
-      ※ 純前端運作，不會上傳任何資料。
+      ※ 格式：s.shopee.tw/an_redir?origin_link=...&amp;affiliate_id=...&amp;sub_id=line666<br>
+      ※ 每次轉換隨機使用一組 Affiliate ID。<br>
+      ※ 可再把結果丟到 reurl 等短網址服務（官方允許的第三方包裝）。<br>
+      ※ 純前端運作，資料不會上傳。
     </p>
   </div>
 
   <script>
-    const AFFILIATE_ID = "16334990029";
+    // ===== 填入要隨機使用的 Affiliate ID =====
+    const AFFILIATE_IDS = [
+      "16334990029",
+      // "第二組ID",
+      // "第三組ID",
+    ];
+
     const SUB_ID = "line666";
 
+    function getRandomAffiliateId() {
+      const list = AFFILIATE_IDS.map(function (id) {
+        return String(id).trim();
+      }).filter(Boolean);
+      if (!list.length) throw new Error("請至少在 AFFILIATE_IDS 填一組 ID");
+      return list[Math.floor(Math.random() * list.length)];
+    }
+
     function cleanShopeeUrl(raw) {
+      var s = raw.trim();
+      if (!s) return null;
       try {
-        const url = new URL(raw.trim());
+        var url = new URL(s);
+        // 只保留 origin + pathname，去掉追蹤參數
         return url.origin + url.pathname;
       } catch (e) {
-        return null;
+        return s.split("?")[0].split("#")[0];
       }
     }
 
+    function isShopeeUrl(url) {
+      return /shopee\.(tw|com|sg|co\.\w+|com\.\w+)/i.test(url) ||
+             /s\.shopee\.tw/i.test(url) ||
+             /shope\.ee/i.test(url);
+    }
+
+    function toAffiliateLink(cleanUrl, affiliateId) {
+      // 官方格式：an_redir?origin_link=ENCODED&affiliate_id=...&sub_id=...
+      return "https://s.shopee.tw/an_redir?origin_link=" +
+        encodeURIComponent(cleanUrl) +
+        "&affiliate_id=" + encodeURIComponent(affiliateId) +
+        "&sub_id=" + encodeURIComponent(SUB_ID);
+    }
+
     function convert() {
-      const inputUrl = document.getElementById("inputUrl").value.trim();
-      if (!inputUrl) {
-        alert("請貼上蝦皮商品連結");
+      var raw = document.getElementById("inputUrl").value;
+      var lines = raw.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+
+      if (!lines.length) {
+        alert("請至少貼上一筆蝦皮商品連結");
         return;
       }
 
-      let cleanUrl = cleanShopeeUrl(inputUrl);
-      if (!cleanUrl) {
-        cleanUrl = inputUrl.split("?")[0].split("#")[0];
+      var results = [];
+      var errors = [];
+
+      for (var i = 0; i < lines.length; i++) {
+        var clean = cleanShopeeUrl(lines[i]);
+        if (!clean || !isShopeeUrl(clean)) {
+          errors.push("第 " + (i + 1) + " 行不是有效的蝦皮連結");
+          continue;
+        }
+        try {
+          var affId = getRandomAffiliateId();
+          results.push(toAffiliateLink(clean, affId));
+        } catch (e) {
+          alert(e.message);
+          return;
+        }
       }
 
-      if (!/shopee\.(tw|com|sg|co\.\w+|com\.\w+)/i.test(cleanUrl) && !/s\.shopee\.tw/i.test(cleanUrl)) {
-        alert("請確認這是蝦皮連結（例如 shopee.tw）");
+      if (!results.length) {
+        alert(errors.join("\n") || "沒有可轉換的連結");
         return;
       }
 
-      const encoded = encodeURIComponent(cleanUrl);
-      const finalUrl =
-        `https://s.shopee.tw/an_redir?origin_link=${encoded}` +
-        `&affiliate_id=${AFFILIATE_ID}` +
-        `&sub_id=${encodeURIComponent(SUB_ID)}`;
-
-      document.getElementById("resultUrl").textContent = finalUrl;
+      document.getElementById("resultUrl").textContent = results.join("\n");
+      document.getElementById("resultCount").textContent =
+        "完成，共產生 " + results.length + " 個推廣連結" +
+        (errors.length ? "（略過 " + errors.length + " 筆無效）" : "");
       document.getElementById("resultBox").classList.add("show");
     }
 
     function copyResult() {
-      const text = document.getElementById("resultUrl").textContent;
-      navigator.clipboard.writeText(text).then(() => {
-        const btn = document.querySelector(".copy-btn");
+      var text = document.getElementById("resultUrl").textContent;
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function () {
+        var btn = document.querySelector(".btn.secondary");
         btn.textContent = "已複製！";
-        setTimeout(() => (btn.textContent = "一鍵複製"), 1500);
-      }).catch(() => {
-        const range = document.createRange();
+        setTimeout(function () { btn.textContent = "一鍵複製全部"; }, 1500);
+      }).catch(function () {
+        var range = document.createRange();
         range.selectNodeContents(document.getElementById("resultUrl"));
-        const sel = window.getSelection();
+        var sel = window.getSelection();
         sel.removeAllRanges();
         sel.addRange(range);
         alert("請手動複製選取的文字");
       });
     }
 
-    document.getElementById("inputUrl").addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        convert();
-      }
-    });
+    function clearAll() {
+      document.getElementById("inputUrl").value = "";
+      document.getElementById("resultUrl").textContent = "";
+      document.getElementById("resultCount").textContent = "";
+      document.getElementById("resultBox").classList.remove("show");
+    }
   </script>
 </body>
 </html>
